@@ -1,81 +1,60 @@
-version: '3.8'
-
 services:
-  # Laravel (PHP-FPM)
   app:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: stationary_app_php
-    restart: unless-stopped
-    working_dir: /var/www
+      dockerfile: docker/php/Dockerfile
+    container_name: stationary_app
     volumes:
-      - ./src:/var/www
+      - .:/var/www
+    networks:
+      - stationary_network
     depends_on:
       - mysql
-    networks:
-      - stationary_net
 
-  # Nginx Web Server
   nginx:
-    image: nginx:alpine
-    container_name: stationary_app_nginx
-    restart: unless-stopped
+    image: nginx:latest
+    container_name: stationary_nginx
     ports:
       - "8080:80"
     volumes:
-      - ./src:/var/www
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - .:/var/www
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - stationary_network
     depends_on:
       - app
-    networks:
-      - stationary_net
 
-  # MySQL Database
   mysql:
     image: mysql:8.0
-    container_name: stationary_app_mysql
-    restart: unless-stopped
+    container_name: stationary_mysql
+    restart: always
     ports:
-      - "3306:3306"
+      - "3307:3306"
     environment:
+      MYSQL_DATABASE: laravel
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: stationary_app
-      MYSQL_USER: stationary_user
-      MYSQL_PASSWORD: stationary_pass
+      MYSQL_USER: laravel
+      MYSQL_PASSWORD: laravel
     volumes:
-      - db_data:/var/lib/mysql
+      - mysql_data:/var/lib/mysql
     networks:
-      - stationary_net
+      - stationary_network
 
-  # Node (for Vue + Inertia)
-  node:
+  npm:
     image: node:20
-    container_name: stationary_app_node
+    container_name: stationary_npm
     working_dir: /var/www
     volumes:
-      - ./src:/var/www
+      - .:/var/www
     command: sh -c "npm install && npm run dev"
     networks:
-      - stationary_net
-
-  # phpMyAdmin (optional)
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin:latest
-    container_name: stationary_app_phpmyadmin
-    restart: unless-stopped
-    ports:
-      - "8081:80"
-    environment:
-      PMA_HOST: mysql
-      MYSQL_ROOT_PASSWORD: root
+      - stationary_network
     depends_on:
-      - mysql
-    networks:
-      - stationary_net
+      - app
 
 volumes:
-  db_data:
+  mysql_data:
 
 networks:
-  stationary_net:
+  stationary_network:
+    driver: bridge
